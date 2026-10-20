@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import { connect, migrate, seed, removeUnusedImages } from '../db.js';
 import { createApp } from '../app.js';
+import { pageRoutes } from '../pages.js';
 import { SETTINGS, COLLECTIONS } from '../../shared/content.js';
 
 const PASSWORD = 'test-password';
 let db, app;
 
 before(async () => {
-  db = await connect({ dataDir: 'memory://' });
+  db = await connect({ url: process.env.PAZ_TEST_DATABASE_URL, dataDir: 'memory://' });
   await migrate(db);
   await seed(db);
   app = createApp({ db, adminPassword: PASSWORD, limits: { join: 3, login: 3 } });
@@ -53,7 +54,7 @@ test('seeding runs only once', async () => {
 
 test('admin routes need a login', async () => {
   await request(app).post('/api/admin/collections/events').send({ title: 'x', date: '2030-01-01' }).expect(401);
-  await request(app).put('/api/admin/settings').send({}).expect(401);
+  await request(app).patch('/api/admin/settings').send({}).expect(401);
   await request(app).get('/api/admin/signups').expect(401);
 });
 
@@ -119,14 +120,92 @@ test('items can be reordered', async () => {
 test('settings are validated and saved', async () => {
   const cookie = await login();
   const { body: content } = await request(app).get('/api/content');
-  const settings = { ...content.settings, heroTitle: 'New headline', colorPrimary: '#112233', layoutHome: 'hero,-gallery,intro,highlights,events,books,cta' };
-  const { body } = await request(app).put('/api/admin/settings').set('Cookie', cookie).send(settings).expect(200);
+  const changes = { heroTitle: 'New headline', colorPrimary: '#112233', layoutHome: 'hero,-gallery,intro,highlights,events,books,cta' };
+  const previous = Object.fromEntries(Object.keys(changes).map((key) => [key, content.settings[key]]));
+  const { body } = await request(app).patch('/api/admin/settings').set('Cookie', cookie).send({ changes, previous }).expect(200);
   assert.equal(body.heroTitle, 'New headline');
   assert.equal(body.layoutHome, 'hero,-gallery,intro,highlights,events,books,cta');
 
   for (const broken of [{ colorPrimary: 'red' }, { siteName: '' }, { homeBooksCount: '99' }, { layoutHome: 'hero' }, { contactEmail: 'nope' }]) {
-    await request(app).put('/api/admin/settings').set('Cookie', cookie).send({ ...settings, ...broken }).expect(400);
+    const previous = Object.fromEntries(Object.keys(broken).map((key) => [key, body[key]]));
+    await request(app).patch('/api/admin/settings').set('Cookie', cookie).send({ changes: broken, previous }).expect(400);
   }
+});
+
+test('independent settings edits are preserved and stale edits are rejected', async () => {
+  const cookie = await login();
+  const initial = (await request(app).get('/api/content')).body.settings;
+  const patch = (changes) => request(app).patch('/api/admin/settings').set('Cookie', cookie)
+    .send({ changes, previous: Object.fromEntries(Object.keys(changes).map((key) => [key, initial[key]])) });
+  await Promise.all([patch({ heroTitle: 'Concurrent headline' }).expect(200), patch({ contactPhone: '123456' }).expect(200)]);
+  const saved = (await request(app).get('/api/content')).body.settings;
+  assert.equal(saved.heroTitle, 'Concurrent headline');
+  assert.equal(saved.contactPhone, '123456');
+  await patch({ heroTitle: 'Stale headline', contactPhone: '999999' }).expect(409);
+  const unchanged = (await request(app).get('/api/content')).body.settings;
+  assert.equal(unchanged.heroTitle, saved.heroTitle);
+  assert.equal(unchanged.contactPhone, saved.contactPhone);
+  for (const payload of [{}, { changes: { heroTitle: 'x' } }, { changes: { unknown: 'x' }, previous: { unknown: '' } }]) {
+    await request(app).patch('/api/admin/settings').set('Cookie', cookie).send(payload).expect(400);
+  }
+});
+
+test('settings and list ordering roll back after a database failure', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const cookie = await login();
+  const initial = (await request(app).get('/api/content')).body;
+  let failOn = 'INSERT INTO settings';
+  let writes = 0;
+  const failingDb = { ...db, transaction: (work) => db.transaction((tx) => work({ query: (sql, params) => {
+    if (sql.startsWith(failOn) && ++writes === 2) throw new Error('Simulated database failure');
+    return tx.query(sql, params);
+  } })) };
+  const failingApp = createApp({ db: failingDb, adminPassword: PASSWORD });
+  await request(failingApp).patch('/api/admin/settings').set('Cookie', cookie).send({
+    changes: { heroTitle: 'Must roll back', contactPhone: '000' },
+    previous: { heroTitle: initial.settings.heroTitle, contactPhone: initial.settings.contactPhone }
+  }).expect(500);
+  assert.deepEqual((await request(app).get('/api/content')).body.settings, initial.settings);
+  failOn = 'UPDATE "services"'; writes = 0;
+  await request(failingApp).post(`/api/admin/collections/services/${initial.services[1].id}/move`)
+    .set('Cookie', cookie).send({ direction: 'up' }).expect(500);
+  assert.deepEqual((await request(app).get('/api/content')).body.services, initial.services);
+});
+
+test('invalid calendar dates, broken links, and missing images are rejected', async () => {
+  const cookie = await login();
+  for (const date of ['2030-02-31', '2025-02-29', '2030-04-31', '2030-13-01']) {
+    await request(app).post('/api/admin/collections/events').set('Cookie', cookie).send({ title: 'Invalid', date }).expect(400);
+  }
+  const event = (await request(app).post('/api/admin/collections/events').set('Cookie', cookie)
+    .send({ title: 'Leap day', date: '2028-02-29' }).expect(201)).body;
+  await request(app).put(`/api/admin/collections/events/${event.id}`).set('Cookie', cookie)
+    .send({ ...event, link: 'https://' }).expect(400);
+  await request(app).post('/api/admin/collections/gallery').set('Cookie', cookie)
+    .send({ image: '/api/images/00000000-0000-0000-0000-000000000000' }).expect(400);
+  await request(app).put(`/api/admin/collections/events/${event.id}`).set('Cookie', cookie)
+    .send({ ...event, title: 'Changed by someone else' }).expect(200);
+  await request(app).put(`/api/admin/collections/events/${event.id}`).set('Cookie', cookie)
+    .send({ ...event, title: 'Stale update', previous: event }).expect(409);
+});
+
+test('private responses are not cached and malformed cookies do not crash authentication', async () => {
+  const cookie = await login();
+  await request(app).get('/api/admin/signups').set('Cookie', cookie).expect('Cache-Control', 'no-store').expect(200);
+  await request(app).get('/api/admin/signups.csv').set('Cookie', cookie).expect('Cache-Control', 'no-store').expect(200);
+  await request(app).get('/api/admin/session').set('Cookie', 'paz_admin=%ZZ').expect(200, { admin: false });
+});
+
+test('page routes normalize known URLs and preserve metadata and 404 status', async () => {
+  const pageApp = createApp({ db, adminPassword: PASSWORD, production: true });
+  pageApp.use(pageRoutes(db, async () => '<html><head><!--app-head--></head><body></body></html>'));
+  await request(pageApp).get('/about/?ref=menu').expect(308).expect('Location', '/about?ref=menu');
+  await request(pageApp).get('/ABOUT').expect(308).expect('Location', '/about');
+  const about = await request(pageApp).get('/about').expect(200);
+  assert.match(about.text, /About \| Professional Authors Zambia/);
+  const admin = await request(pageApp).get('/admin').expect(200).expect('Cache-Control', 'no-store');
+  assert.match(admin.text, /noindex, nofollow/);
+  await request(pageApp).get('/missing-page').expect(404);
 });
 
 test('join form saves sign-ups, ignores bots, and is rate limited', async () => {

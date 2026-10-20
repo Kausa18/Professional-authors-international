@@ -2,7 +2,7 @@
 // The server uses it to build database tables and validate input, and the
 // admin uses it to draw its forms. Default values live in server/seed/defaults.js.
 
-export const IMAGE_PATTERN = /^\/api\/images\/[0-9a-f-]{36}$/;
+export const IMAGE_PATTERN = /^\/api\/images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const URL_PATTERN = /^https?:\/\/\S+$/i;
@@ -260,14 +260,18 @@ function checkValue(field, raw) {
 
   const bad = (msg) => ({ error: `${field.label}: ${msg}` });
   switch (type) {
-    case 'date':
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v))) return bad('please choose a valid date.');
+    case 'date': {
+      const date = new Date(v + 'T00:00:00Z');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== v) return bad('please choose a valid date.');
       break;
+    }
     case 'time':
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return bad('please enter the time as HH:MM.');
       break;
     case 'url':
-      if (!URL_PATTERN.test(v) || v.length > 500) return bad('links must start with http:// or https://');
+      try {
+        if (!URL_PATTERN.test(v) || v.length > 500 || !new URL(v).hostname) return bad('links must start with http:// or https://');
+      } catch { return bad('please enter a valid link.'); }
       break;
     case 'email':
       if (!EMAIL_PATTERN.test(v)) return bad('please enter a valid email address.');

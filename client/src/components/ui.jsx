@@ -31,7 +31,7 @@ export function SectionHeading({ title, intro, children }) {
 }
 
 const BUTTON = {
-  base: 'inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-sans text-sm font-semibold transition-colors',
+  base: 'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 py-3 text-center font-sans text-sm font-semibold transition-colors',
   primary: 'bg-primary text-on-primary hover:bg-[color-mix(in_oklab,var(--primary)_85%,var(--ink))]',
   outline: 'border border-ink/25 text-ink hover:border-ink hover:bg-ink/5'
 };
@@ -42,7 +42,7 @@ export function ButtonLink({ to, variant = 'primary', className = '', children }
 }
 
 export function Button({ variant = 'primary', className = '', ...props }) {
-  return <button className={`${BUTTON.base} ${BUTTON[variant]} disabled:opacity-60 ${className}`} {...props} />;
+  return <button className={`${BUTTON.base} ${BUTTON[variant]} disabled:cursor-not-allowed disabled:opacity-60 ${className}`} {...props} />;
 }
 
 // Text typed in the admin keeps its line breaks.

@@ -7,6 +7,7 @@ import Home from './pages/Home.jsx';
 import About from './pages/About.jsx';
 import Join from './pages/Join.jsx';
 import { Books, Events, Membership, NotFound, Services } from './pages/ListPages.jsx';
+import StatusScreen from './components/StatusScreen.jsx';
 
 // Visitors never download the admin code unless they open /admin.
 const Admin = lazy(() => import('./pages/admin/Admin.jsx'));
@@ -25,7 +26,7 @@ export default function App() {
           })}
           <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="/admin" element={<Suspense><Admin /></Suspense>} />
+        <Route path="/admin" element={<Suspense fallback={<StatusScreen label="Loading the admin…" />}><Admin /></Suspense>} />
       </Routes>
     </ContentProvider>
   );

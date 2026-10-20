@@ -22,9 +22,23 @@ function csvCell(value) {
 }
 
 const imagesOf = (fields, row) => fields.filter((f) => f.type === 'image').map((f) => row?.[f.key]).filter(Boolean);
+const problem = (status, message) => Object.assign(new Error(message), { status });
+
+async function checkImages(db, fields, value) {
+  for (const image of imagesOf(fields, value)) {
+    if (!(await db.query('SELECT 1 FROM images WHERE id = $1', [image.split('/').pop()])).length) {
+      throw problem(400, 'That photo is no longer available. Please upload it again.');
+    }
+  }
+}
 
 export function adminRoutes(db, auth, { loginLimiter }) {
   const router = express.Router();
+  router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  const write = (status, work) => async (req, res) => {
+    const body = await db.transaction((tx) => work(tx, req));
+    res.status(status).json(body);
+  };
 
   router.post('/login', loginLimiter, async (req, res) => {
     if (!auth.passwordMatches(req.body?.password ?? '')) return res.status(401).json({ error: 'Wrong password.' });
@@ -40,16 +54,29 @@ export function adminRoutes(db, auth, { loginLimiter }) {
   // Everything below needs a logged-in admin.
   router.use(auth.requireAdmin);
 
-  router.put('/settings', async (req, res) => {
-    const { value, error } = validate(SETTINGS, req.body);
-    if (error) return res.status(400).json({ error });
+  router.patch('/settings', write(200, async (db, req) => {
+    const { changes, previous } = req.body ?? {};
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || !previous || typeof previous !== 'object') {
+      throw problem(400, 'Please send the changed settings and their previous values.');
+    }
+    const keys = Object.keys(changes);
+    const fields = SETTINGS.filter((field) => keys.includes(field.key));
+    if (!keys.length || fields.length !== keys.length || keys.some((key) => typeof previous[key] !== 'string')) {
+      throw problem(400, 'Invalid settings update. Please reload and try again.');
+    }
+    const { value, error } = validate(fields, changes);
+    if (error) throw problem(400, error);
     const before = await loadSettings(db);
+    if (keys.some((key) => before[key] !== previous[key])) {
+      throw problem(409, 'These settings changed in another tab. Reload the latest values, then apply your changes again.');
+    }
+    await checkImages(db, fields, value);
     for (const [key, v] of Object.entries(value)) {
       await db.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, v]);
     }
-    await releaseImages(db, imagesOf(SETTINGS, before).filter((p) => !Object.values(value).includes(p)));
-    res.json(await loadSettings(db));
-  });
+    await releaseImages(db, imagesOf(fields, before).filter((p) => !Object.values(value).includes(p)));
+    return loadSettings(db);
+  }));
 
   router.post('/images', express.raw({ type: IMAGE_TYPES, limit: MAX_IMAGE_BYTES }), async (req, res) => {
     const mime = req.get('content-type');
@@ -67,12 +94,13 @@ export function adminRoutes(db, auth, { loginLimiter }) {
     next();
   }, list);
 
-  const findItem = async (name, id) => (UUID.test(id) ? (await db.query(`SELECT * FROM ${q(name)} WHERE id = $1`, [id]))[0] : undefined);
+  const findItem = async (db, name, id) => (UUID.test(id) ? (await db.query(`SELECT * FROM ${q(name)} WHERE id = $1`, [id]))[0] : undefined);
 
-  list.post('/', async (req, res) => {
+  list.post('/', write(201, async (db, req) => {
     const { name } = req.params;
     const { value, error } = validate(req.def.fields, req.body);
-    if (error) return res.status(400).json({ error });
+    if (error) throw problem(400, error);
+    await checkImages(db, req.def.fields, value);
     const keys = Object.keys(value);
     const [item] = await db.query(
       `INSERT INTO ${q(name)} (id, position, ${keys.map(q).join(', ')})
@@ -80,48 +108,52 @@ export function adminRoutes(db, auth, { loginLimiter }) {
        RETURNING id`,
       [crypto.randomUUID(), ...keys.map((k) => value[k])]
     );
-    res.status(201).json({ id: item.id, ...value });
-  });
+    return { id: item.id, ...value };
+  }));
 
-  list.put('/:id', async (req, res) => {
+  list.put('/:id', write(200, async (db, req) => {
     const { name, id } = req.params;
-    const existing = await findItem(name, id);
-    if (!existing) return res.status(404).json({ error: 'Item not found.' });
+    const existing = await findItem(db, name, id);
+    if (!existing) throw problem(404, 'Item not found.');
+    if (req.body.previous && req.def.fields.some((field) => existing[field.key] !== req.body.previous[field.key])) {
+      throw problem(409, 'This item changed in another tab. Open it again to load the latest version.');
+    }
     const { value, error } = validate(req.def.fields, req.body);
-    if (error) return res.status(400).json({ error });
+    if (error) throw problem(400, error);
+    await checkImages(db, req.def.fields, value);
     const keys = Object.keys(value);
     await db.query(
       `UPDATE ${q(name)} SET ${keys.map((k, i) => `${q(k)} = $${i + 2}`).join(', ')} WHERE id = $1`,
       [id, ...keys.map((k) => value[k])]
     );
     await releaseImages(db, imagesOf(req.def.fields, existing).filter((p) => !Object.values(value).includes(p)));
-    res.json({ id, ...value });
-  });
+    return { id, ...value };
+  }));
 
-  list.delete('/:id', async (req, res) => {
+  list.delete('/:id', write(200, async (db, req) => {
     const { name, id } = req.params;
-    const existing = await findItem(name, id);
-    if (!existing) return res.status(404).json({ error: 'Item not found.' });
+    const existing = await findItem(db, name, id);
+    if (!existing) throw problem(404, 'Item not found.');
     await db.query(`DELETE FROM ${q(name)} WHERE id = $1`, [id]);
     await releaseImages(db, imagesOf(req.def.fields, existing));
-    res.json({ ok: true });
-  });
+    return { ok: true };
+  }));
 
-  list.post('/:id/move', async (req, res) => {
+  list.post('/:id/move', write(200, async (db, req) => {
     const { name, id } = req.params;
-    if (req.def.sortBy) return res.status(400).json({ error: 'This list is sorted automatically.' });
+    if (req.def.sortBy) throw problem(400, 'This list is sorted automatically.');
     const step = req.body?.direction === 'up' ? -1 : req.body?.direction === 'down' ? 1 : 0;
-    if (!step) return res.status(400).json({ error: 'Invalid direction.' });
+    if (!step) throw problem(400, 'Invalid direction.');
     const ids = (await loadCollection(db, name)).map((r) => r.id);
     const from = ids.indexOf(id);
-    if (from < 0) return res.status(404).json({ error: 'Item not found.' });
+    if (from < 0) throw problem(404, 'Item not found.');
     const to = from + step;
     if (to >= 0 && to < ids.length) {
       [ids[from], ids[to]] = [ids[to], ids[from]];
       for (const [i, itemId] of ids.entries()) await db.query(`UPDATE ${q(name)} SET position = $1 WHERE id = $2`, [i + 1, itemId]);
     }
-    res.json({ ok: true });
-  });
+    return { ok: true };
+  }));
 
   // ---------- Join form sign-ups ----------
   const signups = () => db.query('SELECT id, name, email, phone, genre, message, created_at FROM signups ORDER BY created_at DESC');

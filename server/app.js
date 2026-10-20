@@ -34,6 +34,7 @@ export function createApp({ db, adminPassword, production = false, trustProxy = 
   api.use((err, req, res, next) => {
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That is too large to upload.' });
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid request.' });
+    if (err.status >= 400 && err.status < 500) return res.status(err.status).json({ error: err.message });
     console.error(err);
     res.status(500).json({ error: 'Something went wrong. Please try again.' });
   });

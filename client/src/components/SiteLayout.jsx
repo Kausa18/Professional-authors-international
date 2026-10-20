@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { PAGES } from '../../../shared/content.js';
 import { useContent, useSettings } from '../lib/content.jsx';
 import { Container } from './ui.jsx';
+import StatusScreen from './StatusScreen.jsx';
 
 function Brand({ settings, compact = false }) {
   return (
-    <Link to="/" className="flex min-w-0 items-center gap-3">
-      {settings.logo && <img src={settings.logo} alt="" className={compact ? 'h-11 w-11 shrink-0' : 'h-16 w-16 shrink-0'} />}
+    <Link to="/" className={`flex min-w-0 items-center gap-3 ${compact ? 'lg:max-w-[20rem]' : ''}`}>
+      {settings.logo && <img src={settings.logo} alt="" width={compact ? 44 : 64} height={compact ? 44 : 64} className={`${compact ? 'h-11 w-11' : 'h-16 w-16'} shrink-0 object-contain`} />}
       <span className="min-w-0">
-        <span className="block truncate font-display text-lg font-semibold leading-tight">{settings.siteName}</span>
-        {settings.tagline && <span className="block truncate font-sans text-xs text-muted">{settings.tagline}</span>}
+        <span className={`block font-display text-lg font-semibold leading-tight ${compact ? 'truncate' : ''}`}>{settings.siteName}</span>
+        {settings.tagline && <span className={`block font-sans text-xs text-muted ${compact ? 'truncate' : 'mt-1'}`}>{settings.tagline}</span>}
       </span>
     </Link>
   );
@@ -21,8 +22,17 @@ const navClass = ({ isActive }) =>
 
 function Header({ settings }) {
   const [open, setOpen] = useState(false);
+  const menuButton = useRef(null);
   const { pathname } = useLocation();
   useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event) => {
+      if (event.key === 'Escape') { setOpen(false); menuButton.current?.focus(); }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [open]);
 
   const links = PAGES.filter((p) => p.key !== 'join' && settings[p.nav]);
   const join = PAGES.find((p) => p.key === 'join');
@@ -39,7 +49,7 @@ function Header({ settings }) {
             </NavLink>
           )}
         </nav>
-        <button type="button" className="rounded-md p-2 lg:hidden" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>
+        <button ref={menuButton} type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line lg:hidden" aria-expanded={open} aria-controls={open ? 'mobile-menu' : undefined} onClick={() => setOpen(!open)}>
           <span className="sr-only">Menu</span>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
@@ -50,7 +60,7 @@ function Header({ settings }) {
         <nav id="mobile-menu" className="border-t border-line lg:hidden" aria-label="Main">
           <Container className="flex flex-col py-2">
             {[...links, join].filter((p) => settings[p.nav]).map((p) => (
-              <NavLink key={p.key} to={p.path} className={({ isActive }) => `py-3 font-sans ${isActive ? 'font-semibold text-highlight' : ''}`}>
+              <NavLink key={p.key} to={p.path} onClick={() => setOpen(false)} className={({ isActive }) => `rounded-lg px-3 py-3 font-sans ${isActive ? 'bg-highlight/10 font-semibold text-highlight' : 'hover:bg-ink/5'}`}>
                 {settings[p.nav]}
               </NavLink>
             ))}
@@ -79,7 +89,7 @@ function Footer({ settings }) {
   const hasContact = settings.contactEmail || settings.contactPhone || settings.address;
   return (
     <footer className="mt-auto border-t border-line bg-card">
-      <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1.5fr]">
+      <Container className={`grid gap-10 py-12 sm:grid-cols-2 ${(hasContact || settings.facebookUrl || settings.instagramUrl) ? 'lg:grid-cols-[2fr_1fr_1.5fr]' : 'lg:grid-cols-[2fr_1fr]'}`}>
         <div>
           <Brand settings={settings} />
           {settings.metaDescription && <p className="mt-4 max-w-sm text-[0.95rem] text-muted">{settings.metaDescription}</p>}
@@ -112,23 +122,20 @@ function Footer({ settings }) {
 }
 
 export default function SiteLayout() {
-  const { status } = useContent();
+  const { status, retry } = useContent();
   const settings = useSettings();
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
-  if (status === 'loading') return <div className="min-h-screen" aria-busy="true" />;
+  if (status === 'loading') return <StatusScreen />;
   if (status === 'error') {
-    return (
-      <Container className="py-24 font-sans">
-        <p role="alert">The website could not load its content. Please refresh the page in a moment.</p>
-      </Container>
-    );
+    return <StatusScreen error="Please check your connection and try again." onRetry={retry} />;
   }
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Header settings={settings} />
-      <main className="flex-1"><Outlet /></main>
+      <main id="main-content" tabIndex={-1} className="flex-1"><Outlet /></main>
       <Footer settings={settings} />
     </div>
   );

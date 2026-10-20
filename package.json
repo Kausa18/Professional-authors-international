@@ -9,6 +9,7 @@
     "build": "vite build",
     "start": "node server/index.js",
     "test": "node --test \"server/test/*.test.js\"",
+    "test:browser": "playwright test",
     "db:create": "node scripts/create-database.js"
   },
   "engines": {
@@ -24,6 +25,7 @@
     "@electric-sql/pglite": "^0.5.10",
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.2",
     "react": "^19.3.1",

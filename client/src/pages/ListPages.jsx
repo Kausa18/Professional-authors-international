@@ -4,7 +4,12 @@ import { ButtonLink, PageHero, Section, SectionHeading } from '../components/ui.
 import { BookGrid, CardGrid, EventList, TierGrid } from '../components/blocks.jsx';
 
 function Empty({ text }) {
-  return text ? <p className="font-sans text-muted">{text}</p> : null;
+  return text ? (
+    <div className="rounded-2xl border border-dashed border-line bg-card px-6 py-14 text-center sm:py-20">
+      <svg aria-hidden className="mx-auto mb-5 h-10 w-10 text-highlight/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1m0-15c3-2 6-2 10-1v15c-4-1-7-1-10 1m0-15v15" /></svg>
+      <p className="mx-auto max-w-lg font-sans text-muted">{text}</p>
+    </div>
+  ) : null;
 }
 
 export function Services() {

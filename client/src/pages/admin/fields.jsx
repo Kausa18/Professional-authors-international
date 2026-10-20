@@ -3,7 +3,7 @@ import { formatLayout, parseLayout } from '../../../../shared/content.js';
 import { useAdminApi } from './session.jsx';
 
 export const inputClass = 'w-full rounded-md border border-line bg-paper px-3 py-2 text-ink focus:border-accent focus:outline-none';
-const smallButton = 'rounded-md border border-line px-3 py-1.5 text-sm hover:border-ink disabled:opacity-40';
+const smallButton = 'inline-flex min-h-11 items-center justify-center rounded-md border border-line px-3 py-1.5 text-sm hover:border-ink disabled:opacity-40';
 
 // Resize a photo in the browser before upload: smaller files, faster pages.
 // PNGs stay PNG so transparent logos keep their transparency.
@@ -11,16 +11,17 @@ async function shrink(file, max = 1600) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   const ctx = canvas.getContext('2d');
-  const png = file.type === 'image/png';
-  if (!png) {
+  const mime = ['image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
+  if (mime === 'image/jpeg') {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, png ? 'image/png' : 'image/jpeg', 0.86));
+  bitmap.close();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.86));
   if (!blob) throw new Error('That photo could not be read. Please try another one.');
   return blob;
 }
@@ -28,11 +29,17 @@ async function shrink(file, max = 1600) {
 function ImageInput({ value, onChange, onBusy, label }) {
   const api = useAdminApi();
   const [status, setStatus] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   async function choose(e) {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) {
+      setStatus('Choose a JPG, PNG, or WebP smaller than 20 MB.');
+      return;
+    }
+    setUploading(true);
     setStatus('Uploading…');
     onBusy(1);
     try {
@@ -43,11 +50,12 @@ function ImageInput({ value, onChange, onBusy, label }) {
       setStatus(err.message);
     } finally {
       onBusy(-1);
+      setUploading(false);
     }
   }
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4" role="group" aria-label={label} aria-busy={uploading}>
       <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-paper">
         {value ? <img src={value} alt="" className="h-full w-full object-contain" /> : <span className="text-xs text-muted">No photo</span>}
       </div>
@@ -55,9 +63,9 @@ function ImageInput({ value, onChange, onBusy, label }) {
         <div className="flex flex-wrap gap-2">
           <label className={`${smallButton} cursor-pointer`}>
             {value ? 'Change photo' : 'Choose photo'}
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={choose} aria-label={label} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} className="sr-only" onChange={choose} aria-label={label} />
           </label>
-          {value && <button type="button" className={smallButton} onClick={() => onChange('')}>Remove</button>}
+          {value && <button type="button" disabled={uploading} className={smallButton} onClick={() => onChange('')}>Remove</button>}
         </div>
         {status && <p className="text-sm text-muted" role="status">{status}</p>}
       </div>
@@ -92,7 +100,7 @@ function Input({ field, value, onChange, onBusy }) {
   const id = `field-${field.key}`;
   switch (field.type) {
     case 'textarea':
-      return <textarea id={id} rows={field.max > 1500 ? 10 : 4} maxLength={field.max} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
+      return <textarea id={id} required={field.required} rows={field.max > 1500 ? 10 : 4} maxLength={field.max} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
     case 'image':
       return <ImageInput value={value} onChange={onChange} onBusy={onBusy} label={field.label} />;
     case 'layout':
@@ -114,7 +122,7 @@ function Input({ field, value, onChange, onBusy }) {
       return <input id={id} type="checkbox" checked={value === 'true'} onChange={(e) => onChange(e.target.checked ? 'true' : 'false')} className="h-5 w-5 accent-[var(--highlight)]" />;
     default: {
       const type = { date: 'date', time: 'time', url: 'url', email: 'email', number: 'number' }[field.type] || 'text';
-      return <input id={id} type={type} min={field.min} max={field.type === 'number' ? field.max : undefined} maxLength={field.type === 'number' ? undefined : field.max}
+      return <input id={id} type={type} required={field.required} min={field.min} max={field.type === 'number' ? field.max : undefined} maxLength={field.type === 'number' ? undefined : field.max}
         value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
     }
   }
@@ -126,7 +134,7 @@ export function FieldRow({ field, value, onChange, onBusy }) {
   return (
     <div className={inline ? 'flex flex-row-reverse items-center justify-end gap-3' : 'space-y-1.5'}>
       <Label htmlFor={Label === 'label' ? `field-${field.key}` : undefined} className="block text-sm font-semibold">
-        {field.label}{field.required && <span className="text-danger"> *</span>}
+        {field.label}{field.required && <span aria-hidden="true" className="text-danger"> *</span>}
       </Label>
       <Input field={field} value={value ?? ''} onChange={onChange} onBusy={onBusy} />
       {field.help && !inline && <p className="text-xs text-muted">{field.help}</p>}

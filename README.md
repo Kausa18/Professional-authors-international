@@ -37,6 +37,10 @@ Everything visitors see is edited from **/admin**. You don't need to change any 
 
 Photos are resized in the browser before upload. Photos that are no longer used are deleted automatically.
 
+Settings save only the fields you changed. If another tab changes the same field, the admin asks you to reload the saved values before trying again. List edits also detect conflicting changes. Save and upload buttons show their progress, and switching admin sections prompts before discarding unsaved edits.
+
+Database setup, initial content, settings updates, list changes, and photo cleanup use transactions, so an interrupted operation rolls back instead of leaving half-applied content. Concurrent PostgreSQL instances coordinate content writes with a transaction lock.
+
 The text the site starts with is in `server/seed/defaults.js`. It is copied into the database only the first time the site runs; after that, the Admin page is the place to change it.
 
 ## Commands
@@ -45,9 +49,16 @@ The text the site starts with is in `server/seed/defaults.js`. It is copied into
 |---|---|
 | `npm run dev` | Runs the site with live reload while you work on the code |
 | `npm test` | Runs the server tests (uses a temporary in-memory database) |
+| `npm run test:browser` | Checks the built website and admin in Chrome at desktop and mobile sizes |
 | `npm run build` | Builds the website into `dist/` |
 | `npm start` | Runs the built website (run `npm run build` first) |
 | `npm run db:create` | Creates the PostgreSQL login and database and saves the connection in `.env` |
+
+For browser checks, run `npm run build` first. Chrome must be installed. To use Edge, set `PLAYWRIGHT_CHANNEL=msedge`; to use Playwright's Chromium, run `npx playwright install chromium` and set `PLAYWRIGHT_CHANNEL=chromium`. In PowerShell, set a variable with `$env:PLAYWRIGHT_CHANNEL = 'msedge'`.
+
+Browser checks use disposable in-memory content at port 4317 and never load `.env` or use your saved content. They cover public pages, navigation, responsive and dark layouts, join submissions, admin settings conflicts, uploads, book editing, and failed/successful logout. Screenshots and failure traces are saved in the ignored `test-results/` folder.
+
+To run the API suite against PostgreSQL, set `PAZ_TEST_DATABASE_URL` to a **new, empty disposable test database**, then run `npm test`. The suite writes and deletes test content; never point it at a database containing content you need to keep. Without that variable, tests use an in-memory database.
 
 ## Putting it online
 

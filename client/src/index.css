@@ -63,6 +63,7 @@
   html {
     background: var(--paper);
     color: var(--ink);
+    scroll-padding-top: 6rem;
   }
   body {
     font-family: var(--font-serif);
@@ -76,11 +77,52 @@
     letter-spacing: -0.015em;
     text-wrap: balance;
   }
+  p, h1, h2, h3, a {
+    overflow-wrap: anywhere;
+  }
+  fieldset {
+    min-width: 0;
+  }
+  button, a, input, textarea, select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled), select {
+    cursor: pointer;
+  }
+  input, textarea, select {
+    font-size: max(1rem, 1em);
+  }
+  textarea {
+    resize: vertical;
+  }
   :focus-visible {
-    outline: 3px solid var(--accent);
+    outline: 3px solid var(--highlight);
     outline-offset: 2px;
   }
   ::selection {
     background: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 0.75rem 1.25rem;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+.skip-link:focus { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

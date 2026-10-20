@@ -5,8 +5,9 @@ import { api } from '../../lib/api.js';
 import { useContent, useSettings, usePageTitle } from '../../lib/content.jsx';
 import { Button } from '../../components/ui.jsx';
 import { inputClass } from './fields.jsx';
-import { AdminSession } from './session.jsx';
+import { AdminSession, useEditGuard } from './session.jsx';
 import { CollectionPanel, SettingsPanel, SignupsPanel } from './panels.jsx';
+import StatusScreen from '../../components/StatusScreen.jsx';
 
 const MENU = [
   { heading: 'Lists', items: Object.entries(COLLECTIONS).map(([key, def]) => ({ id: `list-${key}`, label: def.label, help: def.help, render: () => <CollectionPanel name={key} /> })) },
@@ -23,6 +24,7 @@ function Login({ onLogin }) {
   async function submit(e) {
     e.preventDefault();
     setSending(true);
+    setError('');
     try {
       await api('POST', '/api/admin/login', { password: new FormData(e.currentTarget).get('password') });
       onLogin();
@@ -42,7 +44,7 @@ function Login({ onLogin }) {
           <input name="password" type="password" required autoFocus autoComplete="current-password" className={inputClass} />
         </label>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <Button type="submit" disabled={sending} className="w-full">Log in</Button>
+        <Button type="submit" disabled={sending} className="w-full">{sending ? 'Logging in…' : 'Log in'}</Button>
         <Link to="/" className="block text-center text-sm text-muted hover:underline">Back to the website</Link>
       </form>
     </div>
@@ -52,12 +54,27 @@ function Login({ onLogin }) {
 function Dashboard({ onLogout }) {
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const { dirty } = useEditGuard();
   const current = ALL_ITEMS.find((i) => i.id === params.get('tab')) ?? ALL_ITEMS.find((i) => i.id === 'list-events');
-  const open = (id) => setParams({ tab: id });
+  const open = (id) => {
+    if (id === current.id || (dirty && !confirm('Discard your unsaved changes?'))) return;
+    setParams({ tab: id });
+  };
 
   async function logout() {
-    await api('POST', '/api/admin/logout').catch(() => {});
-    onLogout();
+    if (loggingOut) return;
+    if (dirty && !confirm('Discard your unsaved changes and log out?')) return;
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await api('POST', '/api/admin/logout');
+      onLogout();
+    } catch {
+      setLogoutError('Log out failed. You are still logged in. Please try again.');
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -70,10 +87,11 @@ function Dashboard({ onLogout }) {
           </div>
           <div className="flex shrink-0 items-center gap-2 text-sm">
             <a href="/" target="_blank" rel="noopener" className="rounded-md px-3 py-1.5 hover:bg-ink/5">View website ↗</a>
-            <button type="button" onClick={logout} className="rounded-md border border-line px-3 py-1.5 hover:border-ink">Log out</button>
+            <button type="button" onClick={logout} disabled={loggingOut} className="min-h-10 rounded-md border border-line px-3 py-1.5 hover:border-ink disabled:opacity-50">{loggingOut ? 'Logging out…' : 'Log out'}</button>
           </div>
         </div>
       </header>
+      {logoutError && <p role="alert" className="border-b border-danger/20 bg-danger/10 px-6 py-3 text-sm text-danger">{logoutError}</p>}
 
       <div className="grid md:grid-cols-[15rem_1fr]">
         <nav aria-label="Admin" className="hidden border-r border-line bg-card md:block">
@@ -113,7 +131,7 @@ function Dashboard({ onLogout }) {
 }
 
 export default function Admin() {
-  const { status } = useContent();
+  const { status, retry } = useContent();
   const [session, setSession] = useState('checking');
   usePageTitle('Admin');
 
@@ -122,8 +140,8 @@ export default function Admin() {
   }, []);
   const expire = useCallback(() => setSession('out'), []);
 
-  if (status === 'loading' || session === 'checking') return <div className="min-h-screen" aria-busy="true" />;
-  if (status === 'error') return <p role="alert" className="p-8">The content could not be loaded. Please make sure the server is running.</p>;
+  if (status === 'loading' || session === 'checking') return <StatusScreen label="Loading the admin…" />;
+  if (status === 'error') return <StatusScreen error="Please check your connection and try again." onRetry={retry} />;
 
   return (
     <div className="font-sans">

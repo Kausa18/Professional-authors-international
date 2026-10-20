@@ -8,14 +8,27 @@ const ContentContext = createContext(null);
 export function ContentProvider({ children }) {
   const [state, setState] = useState({ status: 'loading', data: null });
 
-  const reload = useCallback(
-    () => api('GET', '/api/content')
-      .then((data) => setState({ status: 'ready', data }))
-      .catch(() => setState((s) => (s.data ? s : { status: 'error', data: null }))),
-    []
-  );
+  const reload = useCallback(async () => {
+    try {
+      const data = await api('GET', '/api/content');
+      setState({ status: 'ready', data });
+      return data;
+    } catch (error) {
+      setState((s) => (s.data ? s : { status: 'error', data: null }));
+      throw error;
+    }
+  }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  const retry = useCallback(() => {
+    setState((s) => ({ ...s, status: s.data ? 'ready' : 'loading' }));
+    return reload().catch(() => {});
+  }, [reload]);
+
+  const updateSettings = useCallback((settings) => {
+    setState((s) => ({ ...s, data: { ...s.data, settings } }));
+  }, []);
+
+  useEffect(() => { reload().catch(() => {}); }, [reload]);
 
   // Keep colours in step when they are changed from the Admin page.
   useEffect(() => {
@@ -25,7 +38,7 @@ export function ContentProvider({ children }) {
     }
   }, [state.data]);
 
-  return <ContentContext value={{ ...state, reload }}>{children}</ContentContext>;
+  return <ContentContext value={{ ...state, reload, retry, updateSettings }}>{children}</ContentContext>;
 }
 
 export const useContent = () => useContext(ContentContext);

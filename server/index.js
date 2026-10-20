@@ -5,8 +5,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { connect, migrate, seed, removeUnusedImages } from './db.js';
 import { createApp } from './app.js';
-import { renderHtml, isKnownPage } from './html.js';
-import { loadSettings } from './routes/public.js';
+import { pageRoutes } from './pages.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 try { process.loadEnvFile(path.join(ROOT, '.env')); } catch { /* no .env file: use the real environment */ }
@@ -66,10 +65,7 @@ if (dev) {
   app.use(express.static(dist, { index: false }));
   getTemplate = async () => template;
 }
-app.get('/{*page}', async (req, res) => {
-  const html = renderHtml(await getTemplate(req.originalUrl), await loadSettings(db), req.path, `${req.protocol}://${req.get('host')}`);
-  res.status(isKnownPage(req.path) ? 200 : 404).set('Cache-Control', 'no-cache').type('html').send(html);
-});
+app.use(pageRoutes(db, getTemplate));
 
 // Tidy up photos nobody uses any more and expired logins, now and every 6 hours.
 async function cleanUp() {

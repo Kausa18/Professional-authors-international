@@ -7,7 +7,9 @@ const sha256 = (value) => crypto.createHash('sha256').update(String(value)).dige
 function readCookie(req, name) {
   for (const part of (req.headers.cookie || '').split(';')) {
     const i = part.indexOf('=');
-    if (i > -1 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+    if (i > -1 && part.slice(0, i).trim() === name) {
+      try { return decodeURIComponent(part.slice(i + 1).trim()); } catch { return ''; }
+    }
   }
   return '';
 }

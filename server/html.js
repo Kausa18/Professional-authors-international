@@ -2,11 +2,16 @@ import { PAGES, themeVariables } from '../shared/content.js';
 
 const escape = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-export const isKnownPage = (pathname) => pathname === '/' || pathname === '/admin' || PAGES.some((p) => p.path === pathname);
+export const normalizePath = (pathname) => pathname.replace(/\/+$/, '').toLowerCase() || '/';
+export const isKnownPage = (pathname) => {
+  const normalized = normalizePath(pathname);
+  return normalized === '/' || normalized === '/admin' || PAGES.some((p) => p.path === normalized);
+};
 
 // Fills the page's <head> from the settings, so the title, description, icon
 // and colours are right before any JavaScript runs (and in link previews).
 export function renderHtml(template, settings, pathname, origin) {
+  pathname = normalizePath(pathname);
   const page = PAGES.find((p) => p.path === pathname);
   const title = page ? `${settings[page.nav]} | ${settings.siteName}` : settings.siteName;
   const description = (page && settings[page.intro]) || settings.metaDescription;
@@ -17,6 +22,7 @@ export function renderHtml(template, settings, pathname, origin) {
     `<title>${escape(title)}</title>`,
     description && `<meta name="description" content="${escape(description)}">`,
     `<meta property="og:type" content="website">`,
+    pathname === '/admin' && '<meta name="robots" content="noindex, nofollow">',
     `<meta property="og:site_name" content="${escape(settings.siteName)}">`,
     `<meta property="og:title" content="${escape(title)}">`,
     description && `<meta property="og:description" content="${escape(description)}">`,
