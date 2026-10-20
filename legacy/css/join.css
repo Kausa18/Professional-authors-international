@@ -1,4 +1,0 @@
-/* Join page only */
-form{display:grid;gap:12px;max-width:460px;margin-top:20px}
-input{padding:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;border-radius:4px}
-input:focus-visible{outline:3px solid var(--ochre)}

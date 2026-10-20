@@ -1,6 +1,0 @@
-/* Book showcase (home page and Books page) */
-.books{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:26px;margin-top:28px}
-.book .cover{aspect-ratio:2/3;border-radius:2px 6px 6px 2px;box-shadow:-4px 4px 0 var(--line);padding:16px;display:flex;flex-direction:column;justify-content:space-between;color:#f3efe6;font-family:Georgia,serif}
-.book:nth-child(4n+1) .cover{background:var(--navy)}.book:nth-child(4n+2) .cover{background:var(--sea)}.book:nth-child(4n+3) .cover{background:#8a4b2a}.book:nth-child(4n+4) .cover{background:#4b3b6b}
-.book .cover b{font-size:1.15rem;line-height:1.2}.book .cover i{font-size:.8rem}
-.book p{margin:10px 0 0;font-size:.95rem}.book small{display:block;opacity:.7}

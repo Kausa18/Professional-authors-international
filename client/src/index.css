@@ -1,0 +1,86 @@
+@import "tailwindcss" source("../");
+
+/* Brand colours (--brand-primary, --brand-accent, --brand-highlight) are set
+   from the Admin page under Appearance. Everything below derives from them. */
+
+@theme {
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --paper: #f7f2e8;
+  --card: #fffdf8;
+  --ink: #1c2230;
+  --muted: #5b6172;
+  --line: #e2dacb;
+  --danger: #b3261e;
+  --primary: var(--brand-primary);
+  --on-primary: #fffdf8;
+  --accent: var(--brand-accent);
+  --highlight: var(--brand-highlight);
+  --band: var(--brand-primary);
+  --on-band: #fffdf8;
+  --band-accent: color-mix(in oklab, var(--brand-accent) 75%, white);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper: #10151f;
+    --card: #171e2b;
+    --ink: #ece7dc;
+    --muted: #a5abb8;
+    --line: #29324a;
+    --danger: #f2b8b5;
+    --primary: color-mix(in oklab, var(--brand-accent) 80%, white);
+    --on-primary: #10151f;
+    --accent: color-mix(in oklab, var(--brand-accent) 80%, white);
+    --highlight: color-mix(in oklab, var(--brand-highlight) 55%, white);
+    --band: color-mix(in oklab, var(--brand-primary) 70%, black);
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-danger: var(--danger);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-highlight: var(--highlight);
+  --color-band: var(--band);
+  --color-on-band: var(--on-band);
+  --color-band-accent: var(--band-accent);
+}
+
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--ink);
+  }
+  body {
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+}
