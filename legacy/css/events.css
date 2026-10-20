@@ -1,0 +1,6 @@
+/* Events page only */
+.events li{padding:14px 0;border-bottom:1px solid var(--line);list-style:none;display:flex;gap:20px;flex-wrap:wrap}
+.events{padding:0;margin:0}.events time{min-width:120px;color:var(--sea);font-weight:700}
+[hidden]{display:none!important}
+.events .meta{opacity:.75;font-size:.95rem}
+#past{opacity:.75}

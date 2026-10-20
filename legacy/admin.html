@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Admin | Professional Authors International</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<header>
+<a class="logo" href="index.html">Professional Authors International</a>
+<nav><a href="events.html">View events page</a><a href="index.html">Back to site</a></nav>
+</header>
+<main>
+<div class="page-hero">
+<p class="eyebrow">Admin</p>
+<h1>Manage events</h1>
+</div>
+
+<section id="login">
+<h2>Log in</h2>
+<form id="loginForm">
+<input type="password" id="password" placeholder="Admin password" aria-label="Admin password" autocomplete="current-password" required>
+<button class="btn" type="submit">Log in</button>
+<p id="loginMsg" class="note" role="status"></p>
+</form>
+</section>
+
+<div id="dashboard" hidden>
+<section>
+<h2 id="formTitle">Add an event</h2>
+<form id="eventForm">
+<input type="text" id="title" placeholder="Event title" aria-label="Event title" maxlength="120" required>
+<div class="row">
+<input type="date" id="date" aria-label="Date" required>
+<input type="time" id="time" aria-label="Time (optional)">
+</div>
+<input type="text" id="location" placeholder="Location (optional)" aria-label="Location" maxlength="120">
+<textarea id="description" placeholder="Description (optional)" aria-label="Description" rows="4" maxlength="1000"></textarea>
+<div>
+<button class="btn" type="submit" id="saveBtn">Add event</button>
+<button class="btn alt" type="button" id="cancelBtn" hidden>Cancel edit</button>
+</div>
+<p id="formMsg" class="note" role="status"></p>
+</form>
+</section>
+
+<section>
+<h2>All events</h2>
+<ul id="adminList" class="admin-list"></ul>
+<button class="btn alt" type="button" id="logoutBtn">Log out</button>
+</section>
+</div>
+</main>
+<footer>© Professional Authors International.</footer>
+<script src="js/admin.js"></script>
+</body>
+</html>

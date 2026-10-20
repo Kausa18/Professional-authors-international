@@ -1,0 +1,11 @@
+/* Admin page only */
+[hidden]{display:none!important}
+form{display:grid;gap:12px;max-width:560px;margin-top:20px}
+input,textarea{padding:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;border-radius:4px;width:100%}
+input:focus-visible,textarea:focus-visible{outline:3px solid var(--ochre)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.admin-list{list-style:none;padding:0;margin:20px 0 28px;max-width:760px}
+.admin-list li{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid var(--line)}
+.admin-list small{display:block;opacity:.7}
+.admin-list button{font:.9rem system-ui,sans-serif;padding:8px 14px;margin-left:8px;border:1px solid var(--ink);background:none;color:var(--ink);border-radius:4px;cursor:pointer}
+.admin-list button.danger{border-color:#b3261e;color:#b3261e}

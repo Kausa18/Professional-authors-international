@@ -1,0 +1,5 @@
+/* Membership page only */
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:28px}
+.tier{background:var(--card);border:1px solid var(--line);padding:26px;border-radius:6px}
+.tier h3{font-size:1.4rem}.tier .p{font:700 1.6rem Georgia,serif;color:var(--sea)}
+.tier ul{padding-left:1.1em;font-size:1rem}

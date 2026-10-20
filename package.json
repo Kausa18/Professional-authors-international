@@ -1,0 +1,14 @@
+{
+  "name": "professional-authors-international",
+  "version": "1.0.0",
+  "description": "Home page server for Professional Authors International",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": { "node": ">=18" }
+}

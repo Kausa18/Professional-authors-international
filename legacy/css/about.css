@@ -1,0 +1,7 @@
+/* About page only. Shared styles live in styles.css */
+#mission p,#story p{max-width:62ch}
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:26px;margin-top:28px}
+.person h3{font-size:1.15rem;margin:12px 0 2px}
+.person p{margin:0;font-size:.95rem;opacity:.8}
+.avatar{aspect-ratio:1;border-radius:50%;background:linear-gradient(135deg,var(--sea),var(--navy));display:flex;align-items:center;justify-content:center;color:#f3efe6;font:.85rem system-ui,sans-serif;max-width:160px}
+.cta{background:var(--card);border:1px solid var(--line);border-radius:6px;margin:0 6vw 8vh;padding:44px 6vw;max-width:1100px}
